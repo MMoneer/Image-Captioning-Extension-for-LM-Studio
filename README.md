@@ -1,5 +1,7 @@
 # Image-Captioning-Extension-for-LM-Studio
-
+This is a Fork from https://github.com/lachhabw/Image-Captioning-Extension-for-LM-Studio
+This fork was created as an underdeveloped and Tested version for the last releases check the original Repo
+Description Below from the Original Repo:
 ## Brief
 
 This repository contains an unofficial extension for [LM Studio](https://lmstudio.ai) designed to automate the process of generating text captions for images. It allows users to utilize LM Studio's image text models like [llava](https://huggingface.co/jartine/llava-v1.5-7B-GGUF) to caption images automatically.
