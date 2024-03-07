@@ -1,116 +1,165 @@
-import tkinter as tk
-from tkinter import ttk  # Import ttk module for Progressbar
-from tkinter import filedialog
+import sys
+import os
+import requests
+import time
+from PySide6 import QtWidgets
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QTimer, QUrl, Slot
+from PySide6.QtWidgets import QFileDialog
+from captioning_ui import Ui_MainWindow
 from openai import OpenAI
 import base64
-import os
 import threading
 from configparser import ConfigParser
 
-class CaptioningApp:
-    def __init__(self, master):
-        self.master = master
-        master.title("Image Captioning Extension")
-        self.source_folder_path = ""
-        self.destination_folder_path = ""
-        self.create_widgets()
-
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        
+        self.folder_path_pt.clicked.connect(self.select_source_folder)
+        self.caption_dest_pt.clicked.connect(self.select_destination_folder)
+        self.run_cation_pt.clicked.connect(self.run_captioning)
+        self.info_pt.clicked.connect(self.open_url)
+        
         # Read configuration from the file
         config = ConfigParser()
         config.read('config.ini')
         self.client = OpenAI(base_url=config.get('OpenAI', 'base_url'), api_key=config.get('OpenAI', 'api_key'))
+        base_url = config.get('OpenAI', 'base_url')  # Fetch base_url from config file
+        self.checker = self.ServerChecker(base_url, self.label_server_status)  # Replace your_label_server_status_object with your actual label object
+        self.checker.start_checking()
+        
+        self.progress_timer = QTimer(self)  # Initialize QTimer
+        self.progress_timer.timeout.connect(self.update_progress)  # Connect timer to update_progress method
+        self.current_progress = 0  # Variable to track progress
+    
+    def closeEvent(self, event):
+        # Stop the server checking process if it's active
+        if self.checker.is_running:
+            self.checker.stop_checking()
+            self.checker.join()
 
-    def create_widgets(self):
-        self.master.geometry("800x600")  # Set initial size
-        self.master.grid_rowconfigure(3, weight=1)
-        self.master.grid_columnconfigure(1, weight=1)
+        # Terminate any running threads related to captioning
+        if hasattr(self, "new_thread"):
+            if self.new_thread.is_alive():
+                self.new_thread.terminate()
+                self.new_thread.join()
 
-        # Source Folder
-        self.source_label = tk.Label(self.master, text="Source Folder:")
-        self.source_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        # Stop the progress timer
+        if self.progress_timer.isActive():
+            self.progress_timer.stop()
 
-        self.source_folder_entry = tk.Entry(self.master, width=40)
-        self.source_folder_entry.grid(row=0, column=1, pady=10, sticky="we")
+        # Call the default closeEvent to ensure proper window closing
+        super().closeEvent(event)
+    
+    def open_url(self):
+        url = "https://github.com/lachhabw/Image-Captioning-Extension-for-LM-Studio"  # Replace with the URL you want to open
+        QDesktopServices.openUrl(QUrl(url))
+        
+    
+    class ServerChecker:
+        def __init__(self, base_url, label_server_status):
+            self.base_url = base_url
+            self.label_server_status = label_server_status
+            self.is_running = False
+            self.thread = None
 
-        self.source_folder_button = tk.Button(self.master, text="Browse", command=self.select_source_folder)
-        self.source_folder_button.grid(row=0, column=2, padx=10, pady=10, sticky="w")
+        def check_server(self):
+            try:
+                response = requests.get(self.base_url)
+                if response.status_code == 200:
+                    self.label_server_status.setStyleSheet("color: green; background-color: rgba(0, 0, 0, 0)")
+                    self.label_server_status.setText("Connected")
+                else:
+                    self.label_server_status.setStyleSheet("color: red; background-color: rgba(0, 0, 0, 0)")
+                    self.label_server_status.setText("Not Connected")
+            except requests.exceptions.RequestException:
+                self.label_server_status.setStyleSheet("color: red; background-color: rgba(0, 0, 0, 0)")
+                self.label_server_status.setText("Not Connected")
 
-        # Destination Folder
-        self.destination_label = tk.Label(self.master, text="Destination Folder:")
-        self.destination_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        def start_checking(self):
+            self.is_running = True
+            self.thread = threading.Thread(target=self.check_server)
+            self.thread.start()
+            threading.Timer(30, self.start_checking).start()  # Check every 30 seconds    
+        
+        def stop_checking(self):
+            self.is_running = False
 
-        self.destination_folder_entry = tk.Entry(self.master, width=40)
-        self.destination_folder_entry.grid(row=1, column=1, pady=10, sticky="we")
-
-        self.destination_folder_button = tk.Button(self.master, text="Browse", command=self.select_destination_folder)
-        self.destination_folder_button.grid(row=1, column=2, padx=10, pady=10, sticky="w")
-
-        # Configure grid column weights for centering
-        self.master.grid_columnconfigure(0, weight=1)
-        self.master.grid_columnconfigure(2, weight=1)
-
-        # Captioning Button
-        self.caption_button = tk.Button(self.master, text="Run Captioning", command=self.run_captioning_thread)
-        self.caption_button.grid(row=2, column=0, columnspan=3, padx=10, pady=10)
-
-        # Debug Text
-        self.debug_text = tk.Text(self.master, height=10, width=50, wrap=tk.WORD, bg="black", fg="white", font=("Consolas", 10))
-        self.debug_text.grid(row=3, column=0, columnspan=3, pady=10, sticky="nsew")
-
-        # Configure tags for styling
-        self.debug_text.tag_configure("success_message", foreground="green")
-        self.debug_text.tag_configure("error_message", foreground="red")
-        self.debug_text.tag_configure("finish_message", foreground="#00FFFF")
-
-        # Make the debug text read-only and scrollable
-        self.debug_text.config(state=tk.DISABLED)
-        scrollbar = tk.Scrollbar(self.master, command=self.debug_text.yview)
-        scrollbar.grid(row=3, column=3, sticky="nsew")
-        self.debug_text.config(yscrollcommand=scrollbar.set)
+        def join(self):
+            if self.thread is not None:
+                self.thread.join()
 
     def select_source_folder(self):
-        folder_path = filedialog.askdirectory()
-        self.source_folder_entry.delete(0, tk.END)
-        self.source_folder_entry.insert(0, folder_path)
+        folder_path = QFileDialog.getExistingDirectory(self, 'Select Source Folder')
+        self.lineEdit_folder_path.setText(folder_path)
         self.source_folder_path = folder_path
+        # check files type is PNG, JPEG, and JPG or not
+        image_files = [name for name in os.listdir(folder_path) if name.lower().endswith((".png", ".jpg", ".jpeg"))]
+        files_count = len(image_files)
+        self.lcdNumber.display(str(files_count))
+        
 
     def select_destination_folder(self):
-        folder_path = filedialog.askdirectory()
-        self.destination_folder_entry.delete(0, tk.END)
-        self.destination_folder_entry.insert(0, folder_path)
+        folder_path = QFileDialog.getExistingDirectory(self, 'Select Destination Folder')
+        self.lineEdit_caption_path.setText(folder_path)
         self.destination_folder_path = folder_path
-
+        
 
     def run_captioning_thread(self):
         # Disable the captioning button
-        self.caption_button.config(state=tk.DISABLED)
+        self.run_cation_pt.setDisabled(True)
         # Start a new thread for captioning
-        new_thread = threading.Thread(target=self.run_captioning)
-        new_thread.start()
+        self.new_thread = threading.Thread(target=self.run_captioning_with_thread)
+        self.new_thread.start()
 
+    def run_captioning_with_thread(self):
+        try:
+            self.run_captioning()
+        finally:
+            # Enable the captioning button after the process finishes
+            self.run_cation_pt.setEnabled(True)
+
+    def update_progress(self):
+        # Update progress bar
+        self.progressBar.setValue(self.current_progress)
+
+        # If progress reaches maximum value, stop QTimer
+        if self.current_progress == self.progressBar.maximum():
+            self.progress_timer.stop()
+            
+            # Enable the captioning button after the process finishes
+            self.run_cation_pt.setEnabled(True)
+    
     def run_captioning(self):
         # Get folders paths
-        self.source_folder_path = self.source_folder_entry.get()
-        self.destination_folder_path = self.destination_folder_entry.get()
-        progress_bar = None
+        self.source_folder_path = self.lineEdit_folder_path.text()
+        self.destination_folder_path = self.lineEdit_caption_path.text()
+        self.progressBar.setValue(0)
 
-        if not self.source_folder_path or not self.destination_folder_path:
-            self.debug_text.config(state=tk.NORMAL)
-            self.debug_text.insert(tk.END, "Please select both source and destination folders.\n", "error_message")
-            self.debug_text.config(state=tk.DISABLED)
-            self.caption_button.config(state=tk.NORMAL)
+        if not self.source_folder_path:
+            self.textEdit.append("Please select the source folder.")
             return
-        
-        try: 
-            # Check the existance of folders
+
+        if not self.destination_folder_path:
+            # If destination folder is not selected, use source folder as destination
+            self.textEdit.append("<font color='blue'>The captions will be saved in the same images folder.</font>")
+            self.destination_folder_path = self.source_folder_path
+
+        try:
+            # Check the existence of folders
+            os.listdir(self.source_folder_path)
             os.listdir(self.destination_folder_path)
             files = os.listdir(self.source_folder_path)
             n_files = len(files)
-            # Set up progress bar
-            progress_var = tk.DoubleVar(value=0)
-            progress_bar = ttk.Progressbar(self.master, variable=progress_var, mode="determinate", maximum=100)
-            progress_bar.grid(row=4, column=0, columnspan=3, padx=2, pady=5, sticky="nsew")
-            # Start captioning
+
+            self.progressBar.setMaximum(n_files)
+            self.current_progress = 0  # Variable to track progress
+            
+            # Start progress timer
+            self.progress_timer.start()
+
             for i, file in enumerate(files):
                 file_path = os.path.join(self.source_folder_path, file)
                 destination_path = os.path.join(self.destination_folder_path, f"{file.split('.')[0]}.txt")
@@ -120,49 +169,49 @@ class CaptioningApp:
 
                 captions = self.caption_server(img)
                 if not captions:
-                    self.debug_text.config(state=tk.NORMAL)
-                    self.debug_text.insert(tk.END, "- Failure: ", "error_message")
-                    self.debug_text.insert(tk.END, f"Unable to caption the image '{file}'. Check if the image is valid, with a supported format (jpeg, jpg, png, are recommended).\n")
-                    self.debug_text.config(state=tk.DISABLED)
+                    self.textEdit.append("- Failure: ")
+                    self.textEdit.append(f"Unable to caption the image '{file}'. Check if the image is valid, with a supported format (jpeg, jpg, png, are recommended).")
                 else:
                     with open(destination_path, "w") as f:
                         f.write(captions)
-                    self.debug_text.config(state=tk.NORMAL)
-                    self.debug_text.insert(tk.END, f"- Success: ", "success_message")
-                    self.debug_text.insert(tk.END, f"Image '{file}' has been captioned and the result saved to '{destination_path}'.\n")
-                    self.debug_text.config(state=tk.DISABLED)
+                    
+                    self.textEdit.append("<font color='green'>- Success: </font>")
+                    self.textEdit.append(f"Image '{file}' has been captioned and the result saved to '{destination_path}'")
+                    # Introduce a delay between iterations
+                    time.sleep(0.1)  # Adjust sleep time as needed
+                    
+                # Increment current_progress
+                self.current_progress += 1
 
-                # Update progress bar
-                progress_value = (i + 1) / n_files * 100
-                progress_var.set(progress_value)
-                self.master.update_idletasks()
-
-            # Add a green message indicating the process has finished
-            self.debug_text.config(state=tk.NORMAL)
-            self.debug_text.insert(tk.END, "Captioning process has finished.\n", "finish_message")
-            self.debug_text.config(state=tk.DISABLED)
+                # Update progress bar after each iteration
+                self.progressBar.setValue(self.current_progress)
             
+            # Stop progress timer
+            self.progress_timer.stop()
+            
+            # Add a green message indicating the process has finished
+            self.textEdit.append("""<font color='green' style='font-weight: bold;'>############################<br>
+    Captioning process has finished.🎉<br>
+    ############################</font>""")
+
+        except FileNotFoundError:
+            self.textEdit.append("Error: Folder not found.")
         except Exception as e:
-            self.debug_text.config(state=tk.NORMAL)
-            self.debug_text.insert(tk.END, f"Error: {e}\n", "error_message")
-            self.debug_text.config(state=tk.DISABLED)
-        
+            self.textEdit.append(f"Error: {e}")
+
         finally:
             # Enable the captioning button after the process finishes
-            self.caption_button.config(state=tk.NORMAL)
-            # Destroy progress bar if it exists
-            if progress_bar:
-                progress_bar.destroy()
-
+            self.run_cation_pt.setEnabled(True)
+    
+    
+           
     def load_img64(self, file_path):
         base64_image = ""
         try:
             image = open(file_path, "rb").read()
             base64_image = base64.b64encode(image).decode("utf-8")
         except Exception as e:
-            self.debug_text.config(state=tk.NORMAL)
-            self.debug_text.insert(tk.END, f"Couldn't read the file: {file_path}\n", "error_message")
-            self.debug_text.config(state=tk.DISABLED)
+            self.textEdit.append(f"Couldn't read the file: {file_path}\n")
         return base64_image
 
     def caption_server(self, base64_image):
@@ -196,9 +245,10 @@ class CaptioningApp:
                 caption = chunk.choices[0].delta.content
                 captions += caption
         return captions.strip()
-
+    
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = CaptioningApp(root)
-    root.mainloop()
+  app = QtWidgets.QApplication(sys.argv)
+  window = MainWindow()
+  window.show()
+  sys.exit(app.exec())
