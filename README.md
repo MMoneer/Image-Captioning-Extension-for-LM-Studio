@@ -1,6 +1,12 @@
 # Image-Captioning-Extension-for-LM-Studio
 This is a Fork from https://github.com/lachhabw/Image-Captioning-Extension-for-LM-Studio  
-This fork was created as an underdeveloped and Tested version for the last releases check the original Repo  
+This fork was created as an underdeveloped and Tested version for the last releases check the original Repo    
+# New Feature added :  
+- Improve GUI
+- server status: LMStudio server status Connected, Not connected  
+- images count: count of the images in the selected folder  
+- If the user didn't choose the captioning folder the captions will save to the same images folder  
+
 Description Below from the Original Repo:  
 ## Brief
 
