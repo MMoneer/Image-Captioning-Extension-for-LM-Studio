@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>icons/file-info-fill (1).svg</file>
+    <file>icons/file-text-outlined_1.svg</file>
+    <file>icons/folder-image-line.svg</file>
+    <file>icons/image-search_3.svg</file>
+  </qresource>
+</RCC>

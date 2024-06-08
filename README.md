@@ -5,17 +5,54 @@ This fork was created as an underdeveloped and Tested version, for the last rele
 - Improve GUI
 - server status: LMStudio server status Connected, Not connected  
 - images count: count of the images in the selected folder  
-- If the user didn't choose the captioning folder the captions will be saved to the same images folder  
+- If the user didn't choose the captioning folder the captions will be saved to the same images folder
+- Play sound when finished captioning
+- Change the server's check  interval time
+
+
+## Snapshot
+
+![Tool Screenshot](Snapshot.png)
+
+**Installation**
+===============
+
+### Automated Installation
+
+1. Open a terminal and navigate to your desired location.
+2. Clone the repository: `git clone https://github.com/MMoneer/Image-Captioning-Extension-for-LM-Studio.git`
+3. Run the installation script for your platform:
+	* **Windows**: `install_win.bat`
+	* **Linux and Mac**: `install_Linux_Mac.sh`
+
+### Manual Installation
+
+1. Clone the repository: `git clone https://github.com/MMoneer/Image-Captioning-Extension-for-LM-Studio.git`
+2. Create a new Python environment and activate it:
+	* `python -m venv myenv`
+	* `myenv\Scripts\activate` (on Windows) or `source myenv/bin/activate` (on Linux and Mac)
+3. Navigate to the `Image-Captioning-Extension-for-LM-Studio` folder using `cd`.
+4. Install the required packages: `pip install -r requirements.txt`
+
+**Running the Script**
+=====================
+
+### Using the Script
+
+1. Run the script using:
+	* **Windows**: `run_win.bat`
+	* **Linux and Mac**: `run_Linux_Mac.sh`
+
+### Using the Executable (EXE)
+
+1. Unzip the file.
+2. Run the EXE file.
 
 Description Below from the Original Repo:  
 ## Brief
 
 This repository contains an unofficial extension for [LM Studio](https://lmstudio.ai) designed to automate the process of generating text captions for images. It allows users to utilize LM Studio's image text models like [llava](https://huggingface.co/jartine/llava-v1.5-7B-GGUF) to caption images automatically.
 
-
-## Snapshot
-
-![Tool Screenshot](Snapshot.png)
 
 ## Workflow Explanation
 
