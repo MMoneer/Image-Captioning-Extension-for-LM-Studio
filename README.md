@@ -14,7 +14,13 @@ This fork was created as an under-development and testing version, for the last 
 
 ![Tool Screenshot](Snapshot.png)
 
-**Installation**
+### The Executable (EXE)
+
+1. Download the captioning.zip file from Releases
+1. Unzip the file.
+2. Navigate to the captioning folder and run the EXE file.
+
+**Installation from the repo**
 ===============
 
 ### Automated Installation
@@ -43,10 +49,7 @@ This fork was created as an under-development and testing version, for the last 
 	* **Windows**: `run_win.bat`
 	* **Linux and Mac**: `run_Linux_Mac.sh`
 
-### Using the Executable (EXE)
 
-1. Unzip the file.
-2. Run the EXE file.
 
 Description Below from the Original Repo:  
 ## Brief
